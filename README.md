@@ -1,109 +1,147 @@
 # Bitcoin Mempool Simulator
 
-A Python-based educational implementation of a Bitcoin-style mempool with transaction validation, fee prioritization, and basic mining simulation.
+A Python implementation of Bitcoin-style mempool policy, demonstrating transaction validation, fee prioritization, and block construction logic as implemented in Bitcoin Core.
 
-## Overview
+## Project Purpose
 
-This project simulates the behavior of a Bitcoin node's mempool, which is a temporary storage area for unconfirmed transactions. The mempool is a critical component of the Bitcoin network, responsible for:
+This project models mempool behavior as policy, distinct from consensus rules. It demonstrates how Bitcoin nodes manage unconfirmed transactions before they are included in blocks.
 
-- Validating incoming transactions
-- Managing unconfirmed transactions
-- Prioritizing transactions by fee rate
-- Preventing double-spending
-- Enabling Replace-By-Fee (RBF) functionality
+**Key Distinction**: Blocks determine consensus. The mempool determines transaction relay and prioritization according to node policy.
 
-## Key Features
+## 1. Validation Before Admission
 
-- **UTXO-based Transaction Model**: Implements the Unspent Transaction Output model used by Bitcoin
-- **Fee Prioritization**: Transactions are ordered by fee rate (satoshis per byte)
-- **Mempool Management**: Implements size limits and eviction policies
-- **Replace-By-Fee (RBF)**: Allows replacing transactions with higher-fee versions
-- **CLI Interface**: Interactive command-line interface for testing and demonstration
+Transactions must pass several checks before entering the mempool:
 
-## Architecture
+### Consensus Validation
+- **UTXO Existence**: All inputs must reference unspent transaction outputs
+- **No Double Spending**: Inputs cannot be spent elsewhere in the blockchain or mempool
+- **Input ≥ Output**: Sum of input values must cover output values plus fees
+- **Valid Signatures**: Cryptographic verification of transaction signatures (simulated)
 
-The code is organized into modular components:
+### Mempool Policy Validation
+- Minimum relay fee requirements
+- Standard transaction formats
+- Size limits
+- Non-standard script verification
 
-1. **transaction.py**: Defines the Transaction class and related functionality
-2. **utxo.py**: Implements the UTXO (Unspent Transaction Output) set
-3. **mempool.py**: Core mempool implementation with validation and prioritization
-4. **main.py**: Command-line interface and demo functionality
+**Note**: A transaction can be valid by consensus but still rejected by mempool policy.
 
-## Why Mempools Are Not Part of Consensus
+## 2. Fee Prioritization
 
-1. **Node Autonomy**: Each node maintains its own mempool independently
-2. **Network Propagation**: Transactions propagate through the network asynchronously
-3. **Temporary Storage**: Mempools are not part of the blockchain's permanent state
-4. **Local Policy**: Nodes can implement different mempool policies (e.g., minimum fee requirements)
+### Fee Rate Calculation
+- **Fee Rate** = Fee (in satoshis) / Virtual Size (in vbytes)
+- This implementation uses a simplified size approximation
 
-## Why Nodes Can Have Different Mempools
+### Miner Incentives
+- Miners maximize revenue by prioritizing higher fee rate transactions
+- Fee rate determines transaction priority, not absolute fee amount
+- Transactions are sorted by ancestor fee rate (feerate including unconfirmed dependencies)
 
-1. **Network Latency**: Transactions may reach nodes at different times
-2. **Policy Differences**: Nodes may have different acceptance criteria
-3. **Resource Constraints**: Nodes may have different memory limits
-4. **Network Partitions**: Temporary network issues can cause inconsistencies
+## 3. Capacity & Eviction
 
-## Fee Rate Importance
+### Mempool Limits
+- Default size limit: 300MB (configurable)
+- Individual transaction size limits
+- Maximum number of transactions
 
-Fee rate (satoshis per byte) determines:
+### Eviction Policy
+When the mempool reaches capacity:
+1. Transactions are sorted by fee rate (lowest first)
+2. Lowest fee rate transactions are evicted until enough space is available
+3. All transactions depending on evicted transactions are also removed (unconfirmed dependencies)
 
-1. **Transaction Priority**: Higher fee rate transactions are prioritized
-2. **Block Inclusion**: Miners prefer transactions with higher fee rates
-3. **Network Congestion**: During high traffic, only high-fee transactions get confirmed quickly
-4. **Economic Security**: Fees incentivize miners to include transactions in blocks
+**Important**: Mempool contents can vary between nodes due to different policies and network conditions.
 
-## What Happens During Congestion
+## 4. Replace-By-Fee (RBF)
 
-1. **Fee Market**: Users compete by offering higher fees
-2. **Mempool Backlog**: Unconfirmed transactions accumulate
-3. **Fee Spikes**: Average transaction fees increase
-4. **Eviction**: Lowest fee transactions may be dropped from mempools
+### Purpose
+- Allows increasing fees for stuck transactions
+- Enables fee bumping without double-spending
+
+### Replacement Rules
+A transaction can replace an existing one if:
+1. It spends all the same inputs
+2. Pays higher absolute fees
+3. Meets minimum fee increase requirements
+4. Doesn't create any new unconfirmed dependencies
+
+## 5. Mining Simulation
+
+### Block Construction
+1. Selects transactions by descending fee rate
+2. Respects block size limits
+3. Updates UTXO set for mined transactions
+4. Removes included transactions from mempool
+
+### Key Distinction
+- **Mining**: Economic activity to extend the blockchain
+- **Validation**: Cryptographic verification of transaction validity
+
+## 6. Policy vs Consensus
+
+### Consensus Rules
+- Must be identical across all nodes
+- Determine valid blocks and transactions
+- Enforced by full node validation
+- Changes require careful network-wide coordination and activation mechanisms 
+
+### Policy Rules
+- Can vary between node implementations
+- Govern transaction relay and mempool behavior
+- Include fee requirements, size limits, and DoS protections
+- Can be updated without network coordination
+
+**Critical Insight**: Mempool differences do not cause blockchain forks. Only invalid blocks can create consensus splits.
+
+## 7. Implementation Details
+
+### Core Components
+- `mempool.py`: Mempool implementation with validation and prioritization
+- `transaction.py`: Transaction data structure and validation
+- `utxo.py`: Unspent Transaction Output set management
+- `simple_run.py`: Interactive command-line interface
+
+**Note on Bitcoin Core Implementation**: In Bitcoin Core, mempool policy is implemented primarily in `policy/` and `validation.cpp`. This project models the separation between mempool policy and consensus validation at a conceptual level.
+
+### Key Design Decisions
+- Simplified fee estimation
+- Conservative DoS protections
+- Prioritization by ancestor fee rate
+- Configurable size limits (Bitcoin Core defaults to 300MB)
+- Simplified standardness checks (no full Bitcoin Script implementation)
+
+### Simplifications
+This educational implementation does not include:
+- Orphan transaction pool
+- Full ancestor/descendant tracking graph
+- Package relay
+- CPFP (Child-Pays-For-Parent) modeling
+- Mempool persistence to disk
+- Full Bitcoin Script implementation
+- P2P network layer
+- Cryptographic signature verification
+- Real proof-of-work mining
+
+## What I Learned
+
+### Key Insights
+1. **Mempool Isolation**: Mempools are not globally synchronized and can differ between nodes
+2. **Fee Market Dynamics**: Network congestion leads to natural fee market formation
+3. **Resource Management**: Mempool limits prevent resource exhaustion attacks
+4. **Miner Incentives**: Miners act economically rationally to maximize fee revenue
+5. **Policy Flexibility**: Nodes can implement different policies without affecting consensus
 
 ## Getting Started
 
-1. Ensure you have Python 3.7+ installed
-2. Clone this repository
-3. Run the simulator:
-   ```
-   python main.py
-   ```
+### Prerequisites
+- Python 3.7+
+- No additional dependencies required
 
-## Example Usage
-
-1. View available commands:
-   ```
-   help
-   ```
-
-2. View UTXOs:
-   ```
-   show_utxos
-   ```
-
-3. Add a transaction:
-   ```
-   add_tx {"inputs": [{"txid": "prev_tx1", "index": 0}], "outputs": [{"address": "addr2", "amount": 900000}], "fee_rate": 10}
-   ```
-
-4. View mempool:
-   ```
-   show_mempool
-   ```
-
-5. Mine a block:
-   ```
-   mine_top_block 1000000
-   ```
-
-## Limitations
-
-This is an educational implementation and does not include:
-- Cryptographic signatures
-- Full Bitcoin scripting
-- P2P network layer
-- Real mining (PoW)
-- Wallet functionality
+### Running the Simulator
+```bash
+python simple_run.py
+```
 
 ## License
 
-MIT License - Feel free to use this code for educational purposes.
+MIT License - For educational and research purposes. Not intended for production use.
